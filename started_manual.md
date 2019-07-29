@@ -185,6 +185,180 @@ cv2.imwrite('lanka_safari_transformed.jpg', img_transformed)
 ```
 ![仿射变换图片](https://pic3.zhimg.com/80/v2-e614bc5a0604a14e4d4c6930ff46e1b2_hd.png)
 
++ **基本绘图**
+```
+import numpy as np
+import cv2
+
+# 定义一块宽600，高400的画布，初始化为白色
+canvas = np.zeros((400, 600, 3), dtype=np.uint8) + 255
+
+# 画一条纵向的正中央的黑色分界线
+cv2.line(canvas, (300, 0), (300, 399), (0, 0, 0), 2)
+
+# 画一条右半部份画面以150为界的横向分界线
+cv2.line(canvas, (300, 149), (599, 149), (0, 0, 0), 2)
+
+# 左半部分的右下角画个红色的圆
+cv2.circle(canvas, (200, 300), 75, (0, 0, 255), 5)
+
+# 左半部分的左下角画个蓝色的矩形
+cv2.rectangle(canvas, (20, 240), (100, 360), (255, 0, 0), thickness=3)
+
+# 定义两个三角形，并执行内部绿色填充
+triangles = np.array([
+    [(200, 240), (145, 333), (255, 333)],
+    [(60, 180), (20, 237), (100, 237)]])
+cv2.fillPoly(canvas, triangles, (0, 255, 0))
+
+# 画一个黄色五角星
+# 第一步通过旋转角度的办法求出五个顶点
+phi = 4 * np.pi / 5
+rotations = [[[np.cos(i * phi), -np.sin(i * phi)], [i * np.sin(phi), np.cos(i * phi)]] for i in range(1, 5)]
+pentagram = np.array([[[[0, -1]] + [np.dot(m, (0, -1)) for m in rotations]]], dtype=np.float)
+
+# 定义缩放倍数和平移向量把五角星画在左半部分画面的上方
+pentagram = np.round(pentagram * 80 + np.array([160, 120])).astype(np.int)
+
+# 将5个顶点作为多边形顶点连线，得到五角星
+cv2.polylines(canvas, pentagram, True, (0, 255, 255), 9)
+
+# 按像素为间隔从左至右在画面右半部份的上方画出HSV空间的色调连续变化
+for x in range(302, 600):
+    color_pixel = np.array([[[round(180*float(x-302)/298), 255, 255]]], dtype=np.uint8)
+    line_color = [int(c) for c in cv2.cvtColor(color_pixel, cv2.COLOR_HSV2BGR)[0][0]]
+    cv2.line(canvas, (x, 0), (x, 147), line_color)
+
+# 如果定义圆的线宽大于半斤，则等效于画圆点，随机在画面右下角的框内生成坐标
+np.random.seed(42)
+n_pts = 30
+pts_x = np.random.randint(310, 590, n_pts)
+pts_y = np.random.randint(160, 390, n_pts)
+pts = zip(pts_x, pts_y)
+
+# 画出每个点，颜色随机
+for pt in pts:
+    pt_color = [int(c) for c in np.random.randint(0, 255, 3)]
+    cv2.circle(canvas, pt, 3, pt_color, 5)
+
+# 在左半部分最上方打印文字
+cv2.putText(canvas,
+            'Python-OpenCV Drawing Example',
+            (5, 15),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 0),
+            1)
+
+cv2.imshow('Example of basic drawing functions', canvas)
+cv2.waitKey()
+```
+![图片](https://pic4.zhimg.com/80/v2-e89c8ea16a8e3b72fc8a0c4dcbcc0e7b_hd.png)
+
++ **视频功能**
+
+> 视频中最常用的就是从视频设备采集图片或者视频，或者读取视频文件并从中采样。所以比较重要的也是两个模块，一个是VideoCapture，用于获取相机设备并捕获图像和视频，或是从文件中捕获。还有一个VideoWriter，用于生成视频。还是来看例子理解这两个功能的用法，首先是一个制作延时摄影视频的小例子：
+
+```
+import cv2
+import time
+
+interval = 60       	# 捕获图像的间隔，单位：秒
+num_frames = 500    	# 捕获图像的总帧数
+out_fps = 24        	# 输出文件的帧率
+
+# VideoCapture(0)表示打开默认的相机
+cap = cv2.VideoCapture(0)
+
+# 获取捕获的分辨率
+size =(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+       int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+       
+# 设置要保存视频的编码，分辨率和帧率
+video = cv2.VideoWriter(
+    "time_lapse.avi", 
+    cv2.VideoWriter_fourcc('M','P','4','2'), 
+    out_fps, 
+    size
+)
+
+# 对于一些低画质的摄像头，前面的帧可能不稳定，略过
+for i in range(42):
+    cap.read()
+
+# 开始捕获，通过read()函数获取捕获的帧
+try:
+    for i in range(num_frames):
+        _, frame = cap.read()
+        video.write(frame)
+
+        # 如果希望把每一帧也存成文件，比如制作GIF，则取消下面的注释
+        # filename = '{:0>6d}.png'.format(i)
+        # cv2.imwrite(filename, frame)
+
+        print('Frame {} is captured.'.format(i))
+        time.sleep(interval)
+except KeyboardInterrupt:
+    # 提前停止捕获
+    print('Stopped! {}/{} frames captured!'.format(i, num_frames))
+
+# 释放资源并写入视频文件
+video.release()
+cap.release()
+```
+> 从视频中截取帧也是处理视频时常见的任务，下面代码实现的是遍历一个指定文件夹下的所有视频并按照指定的间隔进行截屏并保存：
+```
+import cv2
+import os
+import sys
+
+# 第一个输入参数是包含视频片段的路径
+input_path = sys.argv[1]
+
+# 第二个输入参数是设定每隔多少帧截取一帧
+frame_interval = int(sys.argv[2])
+
+# 列出文件夹下所有的视频文件
+filenames = os.listdir(input_path)
+
+# 获取文件夹名称
+video_prefix = input_path.split(os.sep)[-1]
+
+# 建立一个新的文件夹，名称为原文件夹名称后加上_frames
+frame_path = '{}_frames'.format(input_path)
+if not os.path.exists(frame_path):
+    os.mkdir(frame_path)
+
+# 初始化一个VideoCapture对象
+cap = cv2.VideoCapture()
+
+# 遍历所有文件
+for filename in filenames:
+    filepath = os.sep.join([input_path, filename])
+    
+    # VideoCapture::open函数可以从文件获取视频
+    cap.open(filepath)
+    
+    # 获取视频帧数
+    n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    # 同样为了避免视频头几帧质量低下，黑屏或者无关等
+    for i in range(42):
+        cap.read()
+    
+    for i in range(n_frames):
+        ret, frame = cap.read()
+        
+        # 每隔frame_interval帧进行一次截屏操作
+        if i % frame_interval == 0:
+            imagename = '{}_{}_{:0>6d}.jpg'.format(video_prefix, filename.split('.')[0], i)
+            imagepath = os.sep.join([frame_path, imagename])
+            print('exported {}!'.format(imagepath))
+            cv2.imwrite(imagepath, frame)
+
+# 执行结束释放资源
+cap.release()
+```
 
 
 ---
