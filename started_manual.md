@@ -1,4 +1,4 @@
-# opencv
+# opencv-Python
 这里使用工具为Python3.5，OpenCV-Python包(cv2)，Numpy，matlablib
 
 一段示例的代码：
@@ -58,8 +58,8 @@ if __name__ == '__main__':
 + 图像读取：cv2.inwrite(保存的文件名，图片名称)
 
 
-## OpenCV使用
-### OpenCV-C++
+# OpenCV-C++
+
 + **初始化图像对象，用Mat类**
 > Mat M(3,2, CV_8UC3, Scalar(0,0,255));
 
